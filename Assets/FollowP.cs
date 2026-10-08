@@ -3,103 +3,141 @@ using UnityEngine;
 
 public class FollowP : MonoBehaviour
 {
+    [Header("Waypoints do tanque verde")]
     public GameObject[] waypoints;
+
+    [Header("Movimento")]
+    public float speed = 10f;
+    public float rotSpeed = 120f;
+    public float stoppingDistance = 3f;
+
     private int currentWP = 0;
-
-    [Header("Tracker")]
-    public float trackerSpeed = 10f;
-
-    [Header("Orbita do Tanque")]
-    public float orbitRadius = 10f;
-    public float orbitSpeed = 1000f;
-    public float rotSpeed = 10f;
-
-    private float orbitAngle;
-    private GameObject tracker;
-    private float tankHeight;
+    private Transform greenTank;
+    private Vector3 formationOffset;
+    private bool isLeader;
 
     void Start()
     {
-        if (waypoints == null || waypoints.Length == 0)
+        // Identificar o tanque verde
+        isLeader = gameObject.name == "GreenTank";
+
+        if (isLeader)
         {
-            Debug.LogError("Nao existem Waypoints configurados!");
+            if (waypoints == null || waypoints.Length == 0)
+            {
+                Debug.LogError("GreenTank sem Waypoints!");
+                enabled = false;
+            }
+
+            return;
+        }
+
+        // Os outros tanques procuram automaticamente o verde
+        GameObject leader = GameObject.Find("GreenTank");
+
+        if (leader == null)
+        {
+            Debug.LogError("GreenTank nao encontrado!");
             enabled = false;
             return;
         }
 
-        tracker = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-        tracker.name = "Tracker";
+        greenTank = leader.transform;
 
-        Destroy(tracker.GetComponent<Collider>());
+        // Manter a posicao inicial relativa ao verde
+        formationOffset =
+            greenTank.InverseTransformPoint(transform.position);
 
-        tracker.transform.position = transform.position;
-
-        tankHeight = transform.position.y;
-
-        // Comecar com o tanque na sua posicao atual
-        Vector3 offset = transform.position - tracker.transform.position;
-
-        if (offset.sqrMagnitude > 0.001f)
-        {
-            orbitAngle = Mathf.Atan2(offset.z, offset.x)
-                         * Mathf.Rad2Deg;
-        }
-        else
-        {
-            orbitAngle = 0f;
-        }
-    }
-
-    void ProgressTracker()
-    {
-        Vector3 target = waypoints[currentWP].transform.position;
-        target.y = tracker.transform.position.y;
-
-        tracker.transform.position = Vector3.MoveTowards(
-            tracker.transform.position,
-            target,
-            trackerSpeed * Time.deltaTime
-        );
-
-        if (Vector3.Distance(tracker.transform.position, target) < 0.1f)
-        {
-            currentWP = (currentWP + 1) % waypoints.Length;
-        }
+        formationOffset.y = 0f;
     }
 
     void Update()
     {
-        ProgressTracker();
-
-        // Angulo aumenta continuamente
-        orbitAngle += orbitSpeed * Time.deltaTime;
-
-        float angleRad = orbitAngle * Mathf.Deg2Rad;
-
-        // Posicao circular relativa ao Tracker
-        Vector3 offset = new Vector3(
-            Mathf.Cos(angleRad) * orbitRadius,
-            0f,
-            Mathf.Sin(angleRad) * orbitRadius
-        );
-
-        Vector3 newPosition = tracker.transform.position + offset;
-        newPosition.y = tankHeight;
-
-        // Calcular direcao do movimento
-        Vector3 movement = newPosition - transform.position;
-
-        if (movement.sqrMagnitude > 0.0001f)
+        if (isLeader)
         {
-            Quaternion targetRotation = Quaternion.LookRotation(movement);
+            MoveLeader();
+        }
+        else
+        {
+            FollowLeader();
+        }
+    }
 
-            transform.rotation = Quaternion.Slerp(
-                transform.rotation,
-                targetRotation,
-                rotSpeed * Time.deltaTime
-            );
+    void MoveLeader()
+    {
+        if (waypoints == null || waypoints.Length == 0)
+            return;
+
+        Vector3 target = waypoints[currentWP].transform.position;
+        target.y = transform.position.y;
+
+        Vector3 direction = target - transform.position;
+
+        // Passar ao proximo Waypoint quando estiver perto
+        if (direction.magnitude < 3f)
+        {
+            currentWP = (currentWP + 1) % waypoints.Length;
+            return;
         }
 
-        transform.position = newPosition;
+        // Rodar suavemente na direcao do Waypoint
+        Quaternion targetRotation = Quaternion.LookRotation(direction);
+
+        transform.rotation = Quaternion.RotateTowards(
+            transform.rotation,
+            targetRotation,
+            rotSpeed * Time.deltaTime
+        );
+
+        // Avancar para o Waypoint sem o ultrapassar
+        transform.position = Vector3.MoveTowards(
+            transform.position,
+            target,
+            speed * Time.deltaTime
+        );
+    }
+
+    void FollowLeader()
+    {
+        if (greenTank == null)
+            return;
+
+        // Cada tanque tem uma posicao diferente na formacao
+        Vector3 destination =
+            greenTank.TransformPoint(formationOffset);
+
+        destination.y = transform.position.y;
+
+        Vector3 direction = destination - transform.position;
+        direction.y = 0f;
+
+        float distance = direction.magnitude;
+
+        if (distance < 0.3f)
+            return;
+
+        MoveTowardsDirection(
+            direction,
+            Mathf.Min(speed, distance * 2f)
+        );
+    }
+
+    void MoveTowardsDirection(Vector3 direction, float moveSpeed)
+    {
+        if (direction.sqrMagnitude < 0.001f)
+            return;
+
+        Quaternion targetRotation =
+            Quaternion.LookRotation(direction);
+
+        transform.rotation = Quaternion.RotateTowards(
+            transform.rotation,
+            targetRotation,
+            rotSpeed * Time.deltaTime
+        );
+
+        // Avancar para a frente, criando curvas em arco
+        transform.position +=
+            transform.forward * moveSpeed * Time.deltaTime;
     }
 }
