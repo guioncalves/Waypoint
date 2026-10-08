@@ -3,22 +3,21 @@ using UnityEngine;
 
 public class FollowP : MonoBehaviour
 {
-    [Header("Waypoints do tanque verde")]
+    [Header("Waypoints")]
     public GameObject[] waypoints;
 
     [Header("Movimento")]
     public float speed = 10f;
     public float rotSpeed = 120f;
-    public float stoppingDistance = 3f;
+    public float stoppingDistance = 4f;
 
     private int currentWP = 0;
-    private Transform greenTank;
-    private Vector3 formationOffset;
     private bool isLeader;
+    private Transform tankToFollow;
 
     void Start()
     {
-        // Identificar o tanque verde
+        // O tanque verde lidera o circuito
         isLeader = gameObject.name == "GreenTank";
 
         if (isLeader)
@@ -32,55 +31,57 @@ public class FollowP : MonoBehaviour
             return;
         }
 
-        // Os outros tanques procuram automaticamente o verde
-        GameObject leader = GameObject.Find("GreenTank");
+        // Cada tanque segue o anterior
+        string leaderName = "";
 
-        if (leader == null)
+        if (gameObject.name == "RedTank")
+            leaderName = "GreenTank";
+        else if (gameObject.name == "BlueTank")
+            leaderName = "RedTank";
+        else if (gameObject.name == "YellowTank")
+            leaderName = "BlueTank";
+        else
         {
-            Debug.LogError("GreenTank nao encontrado!");
+            Debug.LogWarning("Tanque nao configurado: " + gameObject.name);
             enabled = false;
             return;
         }
 
-        greenTank = leader.transform;
+        GameObject leader = GameObject.Find(leaderName);
 
-        // Manter a posicao inicial relativa ao verde
-        formationOffset =
-            greenTank.InverseTransformPoint(transform.position);
+        if (leader == null)
+        {
+            Debug.LogError("Nao foi encontrado: " + leaderName);
+            enabled = false;
+            return;
+        }
 
-        formationOffset.y = 0f;
+        tankToFollow = leader.transform;
     }
 
     void Update()
     {
         if (isLeader)
-        {
             MoveLeader();
-        }
         else
-        {
-            FollowLeader();
-        }
+            FollowTank();
     }
 
     void MoveLeader()
     {
-        if (waypoints == null || waypoints.Length == 0)
-            return;
+        Vector3 direction =
+            waypoints[currentWP].transform.position - transform.position;
 
-        Vector3 target = waypoints[currentWP].transform.position;
-        target.y = transform.position.y;
+        direction.y = 0f;
 
-        Vector3 direction = target - transform.position;
-
-        // Passar ao proximo Waypoint quando estiver perto
+        // Passar ao proximo Waypoint
         if (direction.magnitude < 3f)
         {
             currentWP = (currentWP + 1) % waypoints.Length;
             return;
         }
 
-        // Rodar suavemente na direcao do Waypoint
+        // Rodar suavemente para o Waypoint
         Quaternion targetRotation = Quaternion.LookRotation(direction);
 
         transform.rotation = Quaternion.RotateTowards(
@@ -89,46 +90,28 @@ public class FollowP : MonoBehaviour
             rotSpeed * Time.deltaTime
         );
 
-        // Avancar para o Waypoint sem o ultrapassar
-        transform.position = Vector3.MoveTowards(
-            transform.position,
-            target,
-            speed * Time.deltaTime
-        );
+        // Avancar para a frente, fazendo curvas em arco
+        transform.position += transform.forward * speed * Time.deltaTime;
     }
 
-    void FollowLeader()
+    void FollowTank()
     {
-        if (greenTank == null)
+        if (tankToFollow == null)
             return;
 
-        // Cada tanque tem uma posicao diferente na formacao
-        Vector3 destination =
-            greenTank.TransformPoint(formationOffset);
+        Vector3 direction =
+            tankToFollow.position - transform.position;
 
-        destination.y = transform.position.y;
-
-        Vector3 direction = destination - transform.position;
         direction.y = 0f;
 
         float distance = direction.magnitude;
 
-        if (distance < 0.3f)
+        // Manter distancia do tanque da frente
+        if (distance <= stoppingDistance)
             return;
 
-        MoveTowardsDirection(
-            direction,
-            Mathf.Min(speed, distance * 2f)
-        );
-    }
-
-    void MoveTowardsDirection(Vector3 direction, float moveSpeed)
-    {
-        if (direction.sqrMagnitude < 0.001f)
-            return;
-
-        Quaternion targetRotation =
-            Quaternion.LookRotation(direction);
+        // Rodar suavemente para o tanque da frente
+        Quaternion targetRotation = Quaternion.LookRotation(direction);
 
         transform.rotation = Quaternion.RotateTowards(
             transform.rotation,
@@ -136,8 +119,12 @@ public class FollowP : MonoBehaviour
             rotSpeed * Time.deltaTime
         );
 
-        // Avancar para a frente, criando curvas em arco
-        transform.position +=
-            transform.forward * moveSpeed * Time.deltaTime;
+        // Avancar sem ultrapassar a distancia minima
+        float movement = Mathf.Min(
+            speed * Time.deltaTime,
+            distance - stoppingDistance
+        );
+
+        transform.position += transform.forward * movement;
     }
 }
