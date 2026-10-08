@@ -1631,6 +1631,7 @@ GameObject:
   - component: {fileID: 3777867619265321942}
   - component: {fileID: 3010842913037526189}
   - component: {fileID: 4748736761446632100}
+  - component: {fileID: 4748736761446632101}
   m_Layer: 0
   m_Name: TankChassis
   m_TagString: Untagged
@@ -2011,6 +2012,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1437566746705059459}
+  - component: {fileID: 2713447972708953233}
   m_Layer: 0
   m_Name: BlueTank
   m_TagString: Untagged
@@ -2018,6 +2020,28 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
+--- !u!114 &2713447972708953233
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2713447972708953232}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b4b61eee812096a419069024d9027cf3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  waypoints:
+  - {fileID: 1400723958}
+  - {fileID: 573163551}
+  - {fileID: 1281486194}
+  - {fileID: 737582758}
+  - {fileID: 2082591009}
+  - {fileID: 828112815}
+  - {fileID: 2122362829}
+  speed: 10
+  rotSpeed: 10
 --- !u!33 &2906081035041282102
 MeshFilter:
   m_ObjectHideFlags: 0
@@ -2368,6 +2392,21 @@ MeshRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!114 &4748736761446632101
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 415357714790244882}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b4b61eee812096a419069024d9027cf3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  waypoints: []
+  speed: 10
+  rotSpeed: 10
 --- !u!33 &4749623970321620459
 MeshFilter:
   m_ObjectHideFlags: 0
@@ -2401,6 +2440,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 9048989675280529225}
+  - component: {fileID: 9048989675280529226}
   m_Layer: 0
   m_Name: RedTank
   m_TagString: Untagged
@@ -2708,6 +2748,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 7871142010654116010}
+  - component: {fileID: 7871142010654116011}
   m_Layer: 0
   m_Name: YellowTank
   m_TagString: Untagged
@@ -2992,6 +3033,7 @@ GameObject:
   - component: {fileID: 6488163041203696156}
   - component: {fileID: 5165508724216532327}
   - component: {fileID: 3423260805961655150}
+  - component: {fileID: 7756499110832327641}
   m_Layer: 0
   m_Name: TankChassis
   m_TagString: Untagged
@@ -2999,6 +3041,21 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
+--- !u!114 &7756499110832327641
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7756499110832327640}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b4b61eee812096a419069024d9027cf3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  waypoints: []
+  speed: 10
+  rotSpeed: 10
 --- !u!4 &7863693248642204184
 Transform:
   m_ObjectHideFlags: 0
@@ -3036,6 +3093,7 @@ MonoBehaviour:
   - {fileID: 828112815}
   - {fileID: 2122362829}
   speed: 10
+  rotSpeed: 10
 --- !u!4 &7871142010654116010
 Transform:
   m_ObjectHideFlags: 0
@@ -3052,6 +3110,28 @@ Transform:
   m_Father: {fileID: 0}
   m_RootOrder: 1
   m_LocalEulerAnglesHint: {x: 0, y: -90, z: 0}
+--- !u!114 &7871142010654116011
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6584456359551941305}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b4b61eee812096a419069024d9027cf3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  waypoints:
+  - {fileID: 1400723958}
+  - {fileID: 573163551}
+  - {fileID: 1281486194}
+  - {fileID: 737582758}
+  - {fileID: 2082591009}
+  - {fileID: 828112815}
+  - {fileID: 2122362829}
+  speed: 10
+  rotSpeed: 10
 --- !u!4 &8076435781734483058
 Transform:
   m_ObjectHideFlags: 0
@@ -3210,3 +3290,25 @@ Transform:
   m_Father: {fileID: 0}
   m_RootOrder: 3
   m_LocalEulerAnglesHint: {x: 0, y: -90, z: 0}
+--- !u!114 &9048989675280529226
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5462622198115272026}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b4b61eee812096a419069024d9027cf3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  waypoints:
+  - {fileID: 1400723958}
+  - {fileID: 573163551}
+  - {fileID: 1281486194}
+  - {fileID: 737582758}
+  - {fileID: 2082591009}
+  - {fileID: 828112815}
+  - {fileID: 2122362829}
+  speed: 10
+  rotSpeed: 10
