@@ -25,7 +25,6 @@ public class WPManager : MonoBehaviour
 
     void Awake()
     {
-        // Obter o Graph associado ao WPManager
         graph = GetComponent<Graph>();
 
         if (graph == null)
@@ -40,42 +39,95 @@ public class WPManager : MonoBehaviour
             return;
         }
 
-        // Registar todos os Waypoints
+        HashSet<GameObject> registered =
+            new HashSet<GameObject>();
+
+        // Registar Waypoints sem duplicados
         for (int i = 0; i < waypoints.Length; i++)
         {
-            if (waypoints[i] != null)
+            GameObject waypoint = waypoints[i];
+
+            if (waypoint == null)
             {
-                graph.AddNode(waypoints[i]);
+                Debug.LogWarning(
+                    "[WPManager] Element " + i +
+                    " nao tem Waypoint atribuido."
+                );
+
+                continue;
             }
+
+            if (!registered.Add(waypoint))
+            {
+                Debug.LogWarning(
+                    "[WPManager] Waypoint repetido: " +
+                    waypoint.name
+                );
+
+                continue;
+            }
+
+            graph.AddNode(waypoint);
         }
 
-        // Registar as ligacoes entre os Waypoints
+        int validLinks = 0;
+
+        // Criar ligacoes entre os Waypoints
         if (links != null)
         {
             for (int i = 0; i < links.Length; i++)
             {
-                Link l = links[i];
+                Link link = links[i];
 
-                if (l.node1 == null || l.node2 == null)
-                    continue;
-
-                // Ligacao de Node 1 para Node 2
-                graph.AddEdger(l.node1, l.node2);
-
-                // Ligacao no sentido inverso, quando permitida
-                if (bidirectionalPaths ||
-                    l.dir == Link.direction.BI)
+                if (link.node1 == null || link.node2 == null)
                 {
-                    graph.AddEdger(l.node2, l.node1);
+                    Debug.LogWarning(
+                        "[WPManager] Link " + i +
+                        " incompleto."
+                    );
+
+                    continue;
                 }
+
+                if (link.node1 == link.node2)
+                {
+                    Debug.LogWarning(
+                        "[WPManager] Link " + i +
+                        " liga um Waypoint a si proprio."
+                    );
+
+                    continue;
+                }
+
+                if (!registered.Contains(link.node1) ||
+                    !registered.Contains(link.node2))
+                {
+                    Debug.LogWarning(
+                        "[WPManager] Link " + i +
+                        " utiliza Waypoints nao registados."
+                    );
+
+                    continue;
+                }
+
+                graph.AddEdger(link.node1, link.node2);
+
+                if (bidirectionalPaths ||
+                    link.dir == Link.direction.BI)
+                {
+                    graph.AddEdger(link.node2, link.node1);
+                }
+
+                validLinks++;
             }
         }
 
         Debug.Log(
             "[WPManager] Grafo construido com " +
-            waypoints.Length + " Waypoints e " +
-            (links != null ? links.Length : 0) +
-            " Links configurados."
+            registered.Count +
+            " Waypoints e " +
+            validLinks +
+            " Links validos."
         );
     }
 }
