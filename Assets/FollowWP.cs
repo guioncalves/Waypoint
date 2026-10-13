@@ -6,178 +6,229 @@ public class FollowWP : MonoBehaviour
 {
     [Header("Movimento")]
     public float speed = 12f;
-    public float accuracy = 1f;
-    public float rotSpeed = 150f;
-
-    [Header("Curvas")]
-    [Range(0.05f, 1f)]
-    public float minTurnSpeed = 0.1f;
+    public float accuracy = 1.5f;
+    public float rotSpeed = 180f;
 
     [Header("Waypoints")]
     public GameObject wpManager;
 
+    [Header("Exploracao pseudoaleatoria")]
+    [Min(0)]
+    public int minExplorationSteps = 2;
+
+    [Min(0)]
+    public int maxExplorationSteps = 5;
+
+    [Range(0f, 1f)]
+    public float destinationChance = 0.25f;
+
     private GameObject[] wps;
-    private Graph graph;
+    private GameObject currentNode;
+    private GameObject previousNode;
+    private GameObject destination;
+
+    private Graph g;
 
     private List<Node> currentPath = new List<Node>();
 
     private int currentWP = 0;
-
-    private GameObject currentNode;
-    private GameObject destination;
+    private int explorationSteps = 0;
+    private int explorationTarget = 0;
 
     private bool isMoving = false;
+    private bool goingToFinalDestination = false;
 
     void Start()
     {
+        Debug.Log("FOLLOWWP ATIVO NO OBJETO: " + gameObject.name);
+
         if (wpManager == null)
         {
-            Debug.LogError(
-                "[TANQUE] WPManager nao atribuido!"
-            );
-
+            Debug.LogError("[TANQUE] WPManager nao atribuido!");
             enabled = false;
             return;
         }
 
-        WPManager manager =
-            wpManager.GetComponent<WPManager>();
+        WPManager manager = wpManager.GetComponent<WPManager>();
 
         if (manager == null)
         {
-            Debug.LogError(
-                "[TANQUE] Componente WPManager nao encontrado!"
-            );
-
+            Debug.LogError("[TANQUE] WPManager nao encontrado!");
             enabled = false;
             return;
         }
 
         wps = manager.waypoints;
-        graph = manager.graph;
+        g = manager.graph;
 
-        if (graph == null ||
-            wps == null ||
-            wps.Length < 10)
+        if (g == null || wps == null || wps.Length == 0)
         {
-            Debug.LogError(
-                "[TANQUE] Graph ou Waypoints invalidos!"
-            );
-
+            Debug.LogError("[TANQUE] Graph ou Waypoints invalidos!");
             enabled = false;
             return;
         }
 
-        // O tanque comeca associado ao WP001.
         currentNode = wps[0];
 
         if (currentNode == null)
         {
-            Debug.LogError(
-                "[TANQUE] WP001 nao atribuido!"
-            );
-
+            Debug.LogError("[TANQUE] Waypoint inicial invalido!");
             enabled = false;
             return;
         }
 
         isMoving = false;
-
-        Debug.Log(
-            "[TANQUE] Parado. A aguardar ordem."
-        );
+        Debug.Log("[TANQUE] Parado. A aguardar ordem.");
     }
 
-    // HELIPAD - WP003
     public void GoToHeli()
     {
-        MoveToWaypoint(2);
+        MoveToWaypoint(2); // WP003
     }
 
-    // RUINS - WP010
     public void GoToRuin()
     {
-        MoveToWaypoint(9);
+        MoveToWaypoint(9); // WP010
     }
 
-    // FACTORY - WP004
     public void GoToFactory()
     {
-        MoveToWaypoint(3);
+        MoveToWaypoint(3); // WP004
     }
 
     void MoveToWaypoint(int index)
     {
-        if (isMoving)
-        {
-            Debug.Log(
-                "[TANQUE] Aguarda a chegada ao destino."
-            );
-
+        if (g == null || isMoving)
             return;
-        }
 
-        if (wps == null ||
-            index < 0 ||
-            index >= wps.Length ||
-            wps[index] == null)
+        if (index < 0 || index >= wps.Length || wps[index] == null)
         {
-            Debug.LogError(
-                "[TANQUE] Waypoint invalido!"
-            );
-
+            Debug.LogWarning("[TANQUE] Destino invalido!");
             return;
         }
 
         destination = wps[index];
 
-        Debug.Log(
-            "[BOTAO] Destino escolhido: " +
-            destination.name
-        );
-
-        // Calcular um novo percurso utilizando A*
-        bool found = graph.AStar(
-            currentNode,
-            destination
-        );
-
-        if (!found)
+        if (!g.AStar(currentNode, destination))
         {
             Debug.LogWarning(
-                "[A*] Nao existe percurso entre " +
-                currentNode.name +
-                " e " +
-                destination.name
+                "[A*] Nao existe caminho para " + destination.name
             );
 
             destination = null;
             return;
         }
 
-        // Copiar o percurso calculado pelo A*
-        currentPath = new List<Node>(graph.pathList);
+        int minimum = Mathf.Max(0, minExplorationSteps);
+        int maximum = Mathf.Max(minimum, maxExplorationSteps);
+
+        explorationTarget = Random.Range(minimum, maximum + 1);
+        explorationSteps = 0;
+
+        previousNode = null;
+        goingToFinalDestination = false;
+        isMoving = true;
+
+        Debug.Log(
+            "[EXPLORACAO] Destino: " + destination.name +
+            " | Passos sorteados: " + explorationTarget
+        );
+
+        ChooseNextWaypoint();
+    }
+
+    void ChooseNextWaypoint()
+    {
+        if (!isMoving)
+            return;
+
+        if (currentNode == destination)
+        {
+            StopTank();
+            return;
+        }
+
+        if (explorationSteps >= explorationTarget)
+        {
+            PlanFinalPath();
+            return;
+        }
+
+        if (explorationSteps >= Mathf.Max(0, minExplorationSteps) &&
+            Random.value < destinationChance)
+        {
+            PlanFinalPath();
+            return;
+        }
+
+        List<GameObject> neighbours =
+            g.GetConnectedWaypoints(currentNode);
+
+        // Evitar regressar imediatamente, se houver alternativa.
+        if (neighbours.Count > 1 && previousNode != null)
+        {
+            neighbours.Remove(previousNode);
+        }
+
+        if (neighbours.Count == 0)
+        {
+            PlanFinalPath();
+            return;
+        }
+
+        GameObject next =
+            neighbours[Random.Range(0, neighbours.Count)];
+
+        Debug.Log(
+            "[EXPLORACAO] " +
+            currentNode.name + " -> " + next.name
+        );
+
+        if (!g.AStar(currentNode, next))
+        {
+            PlanFinalPath();
+            return;
+        }
+
+        SetCurrentPath();
+    }
+
+    void PlanFinalPath()
+    {
+        if (!isMoving || destination == null)
+            return;
+
+        goingToFinalDestination = true;
+
+        Debug.Log(
+            "[A*] Caminho final para " + destination.name
+        );
+
+        if (!g.AStar(currentNode, destination))
+        {
+            Debug.LogWarning("[A*] Destino inacessivel!");
+            StopTank();
+            return;
+        }
+
+        SetCurrentPath();
+    }
+
+    void SetCurrentPath()
+    {
+        currentPath = new List<Node>(g.pathList);
+        currentWP = 0;
 
         if (currentPath.Count == 0)
         {
-            Debug.LogWarning(
-                "[A*] O percurso esta vazio!"
-            );
-
-            destination = null;
+            StopTank();
             return;
         }
 
-        currentWP = 0;
+        // O primeiro Node corresponde a origem da pesquisa.
+        GameObject first = currentPath[0].getId();
 
-        // Se ja estiver perto do primeiro Waypoint,
-        // avancar diretamente para o seguinte.
-        GameObject firstWaypoint =
-            currentPath[0].getId();
-
-        Vector3 firstPosition =
-            firstWaypoint.transform.position;
-
+        Vector3 firstPosition = first.transform.position;
         firstPosition.y = transform.position.y;
 
         if (Vector3.Distance(
@@ -188,28 +239,9 @@ public class FollowWP : MonoBehaviour
             currentWP = 1;
         }
 
-        isMoving = true;
-
-        Debug.Log(
-            "[A*] Percurso escolhido com " +
-            currentPath.Count +
-            " Waypoints."
-        );
-
-        for (int i = 0; i < currentPath.Count; i++)
-        {
-            Debug.Log(
-                "[A*] " +
-                i +
-                ": " +
-                currentPath[i].getId().name
-            );
-        }
-
-        // Se a origem ja for o destino
         if (currentWP >= currentPath.Count)
         {
-            StopTank();
+            FinishCurrentPath();
         }
     }
 
@@ -220,123 +252,113 @@ public class FollowWP : MonoBehaviour
 
         if (currentWP >= currentPath.Count)
         {
-            StopTank();
+            FinishCurrentPath();
             return;
         }
 
-        GameObject waypoint =
-            currentPath[currentWP].getId();
+        GameObject waypoint = currentPath[currentWP].getId();
 
         if (waypoint == null)
         {
-            Debug.LogError(
-                "[TANQUE] Waypoint do percurso invalido!"
-            );
-
+            Debug.LogError("[TANQUE] Waypoint invalido!");
             StopTank();
             return;
         }
 
-        Vector3 targetPosition =
-            waypoint.transform.position;
+        Vector3 target = waypoint.transform.position;
+        target.y = transform.position.y;
 
-        // Movimento apenas no plano horizontal
-        targetPosition.y = transform.position.y;
+        Vector3 direction = target - transform.position;
 
-        Vector3 direction =
-            targetPosition - transform.position;
-
-        float distance = direction.magnitude;
-
-        // Verificar chegada ao Waypoint atual
-        if (distance <= accuracy)
+        if (direction.magnitude <= accuracy)
         {
-            // Guardar a ligacao efetivamente percorrida
-            if (currentNode != null &&
-                currentNode != waypoint)
+            GameObject oldNode = currentNode;
+
+            if (oldNode != null && oldNode != waypoint)
             {
-                graph.RegisterTraversal(
-                    currentNode,
-                    waypoint
-                );
+                g.RegisterTraversal(oldNode, waypoint);
             }
 
-            // Atualizar a posicao logica do tanque
+            previousNode = oldNode;
             currentNode = waypoint;
 
-            Debug.Log(
-                "[CHEGADA] " +
-                waypoint.name
-            );
+            Debug.Log("[CHEGADA] " + waypoint.name);
 
-            // Avancar para o proximo Waypoint do percurso
             currentWP++;
 
-            // Parar apenas no destino final
-            if (currentWP >= currentPath.Count)
+            // Se ja chegou ao destino, parar imediatamente.
+            if (currentNode == destination)
             {
                 StopTank();
+                return;
+            }
+
+            if (currentWP >= currentPath.Count)
+            {
+                FinishCurrentPath();
             }
 
             return;
         }
 
-        // Rodar gradualmente para o Waypoint
         Quaternion targetRotation =
             Quaternion.LookRotation(direction);
 
-        transform.rotation =
-            Quaternion.RotateTowards(
-                transform.rotation,
-                targetRotation,
-                rotSpeed * Time.deltaTime
+        transform.rotation = Quaternion.RotateTowards(
+            transform.rotation,
+            targetRotation,
+            rotSpeed * Time.deltaTime
+        );
+
+        // Rodar antes de avancar.
+        if (Vector3.Angle(transform.forward, direction) < 45f)
+        {
+            transform.position = Vector3.MoveTowards(
+                transform.position,
+                target,
+                speed * Time.deltaTime
             );
+        }
+    }
 
-        // Calcular o angulo entre a frente do tanque
-        // e a direcao do Waypoint
-        float angle = Vector3.Angle(
-            transform.forward,
-            direction
+    void FinishCurrentPath()
+    {
+        if (!isMoving)
+            return;
+
+        if (goingToFinalDestination || currentNode == destination)
+        {
+            StopTank();
+            return;
+        }
+
+        explorationSteps++;
+
+        Debug.Log(
+            "[EXPLORACAO] Passo " +
+            explorationSteps + "/" + explorationTarget
         );
 
-        // Reduzir a velocidade nas curvas apertadas
-        float turnFactor = Mathf.Lerp(
-            minTurnSpeed,
-            1f,
-            1f - angle / 180f
-        );
-
-        float currentSpeed =
-            speed * turnFactor;
-
-        // Avancar na direcao para onde o tanque aponta
-        float step = Mathf.Min(
-            currentSpeed * Time.deltaTime,
-            distance
-        );
-
-        transform.position +=
-            transform.forward * step;
+        ChooseNextWaypoint();
     }
 
     void StopTank()
     {
         isMoving = false;
+        goingToFinalDestination = false;
 
         currentWP = 0;
         currentPath.Clear();
 
         Debug.Log(
-            "[TANQUE PARADO] Destino: " +
-            (destination != null
-                ? destination.name
-                : "desconhecido")
+            "[TANQUE PARADO] Posicao: " +
+            (currentNode != null
+                ? currentNode.name
+                : "desconhecida")
         );
 
         destination = null;
 
-        Debug.Log(
-            "[TANQUE] A aguardar outro botao."
-        );
+        Debug.Log("[TANQUE] A aguardar outro botao.");
     }
 }
