@@ -1,66 +1,123 @@
+
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class Follow : MonoBehaviour
+public class FollowWP : MonoBehaviour
 {
     Transform goal;
-    float speed = 5.0f;
-    float accuracy = 5.0f;
-    float rotSpeed = 2.0f;
+
+    public float speed = 5.0f;
+    public float accuracy = 5.0f;
+    public float rotSpeed = 2.0f;
 
     public GameObject wpManager;
+
     GameObject[] wps;
     GameObject currentNode;
+
     int currentWP = 0;
     Graph g;
 
-    // Start is called before the first frame update
     void Start()
     {
-        wps = wpManager.GetComponent<WPManager>().waypoints;
-        g = wpManager.GetComponent<WPManager>().graph;
+        if (wpManager == null)
+        {
+            Debug.LogError("WPManager nao atribuido!");
+            enabled = false;
+            return;
+        }
+
+        WPManager manager = wpManager.GetComponent<WPManager>();
+
+        if (manager == null)
+        {
+            Debug.LogError("Componente WPManager nao encontrado!");
+            enabled = false;
+            return;
+        }
+
+        wps = manager.waypoints;
+        g = manager.graph;
+
+        if (g == null || wps == null || wps.Length < 2)
+        {
+            Debug.LogError("Graph ou Waypoints invalidos!");
+            enabled = false;
+            return;
+        }
+
         currentNode = wps[0];
 
-        Invoke("GoToRuin", 2);
+        Invoke(nameof(GoToRuin), 2f);
     }
 
     public void GoToHeli()
     {
-        g.AStar(currentNode, wps[0]);
-        currentWP = 0;
+        if (g.AStar(currentNode, wps[0]))
+            currentWP = 0;
     }
 
-    public void GotoRuin()
+    public void GoToRuin()
     {
-        g.AStar(currentNode, wps[1]);
-        currentWP = 0;
+        if (g.AStar(currentNode, wps[1]))
+            currentWP = 0;
     }
 
-    // Update is called once per frame
     void LateUpdate()
     {
-        if (g.pathList.Count == 0 || currentWP == g.pathList.Count)
+        if (g == null ||
+            g.pathList.Count == 0 ||
+            currentWP >= g.pathList.Count)
+        {
             return;
+        }
 
-        if (Vector3.Distance(g.pathList[currentWP].getId().transform.position,
-            this.transform.position) < accuracy)
+        Vector3 targetPosition =
+            g.pathList[currentWP].getId().transform.position;
+
+        targetPosition.y = transform.position.y;
+
+        if (Vector3.Distance(transform.position, targetPosition) < accuracy)
         {
             currentNode = g.pathList[currentWP].getId();
             currentWP++;
         }
 
-        if(currentWP < g.pathList.Count)
+        if (currentWP >= g.pathList.Count)
+            return;
+
+        goal = g.pathList[currentWP].getId().transform;
+
+        Vector3 lookAtGoal = new Vector3(
+            goal.position.x,
+            transform.position.y,
+            goal.position.z
+        );
+
+        Vector3 direction = lookAtGoal - transform.position;
+
+        if (direction.sqrMagnitude < 0.001f)
+            return;
+
+        Quaternion targetRotation = Quaternion.LookRotation(direction);
+
+        transform.rotation = Quaternion.Slerp(
+            transform.rotation,
+            targetRotation,
+            Time.deltaTime * rotSpeed
+        );
+
+        // Evita avancar enquanto estiver demasiado desalinhado
+        float angle = Vector3.Angle(transform.forward, direction);
+
+        if (angle < 45f)
         {
-            goal = g.pathList[currentWP].getId().transform;
-            Vector3 lookAtGoal = new Vector3(goal.position.x, this.transform.position.y, goal.position.z);
-
-            Vector3 direction = lookAtGoal - this.transform.position;
-            this.transform.rotation = Quaternion.Slerp(this.transform.rotation, Quaternion.LookRotation(direction), Time.deltaTime * rotSpeed);
-
-            this.transform.Translate(0, 0, speed * Time.deltaTime);
-
+            transform.Translate(
+                0,
+                0,
+                speed * Time.deltaTime
+            );
         }
-            
     }
 }
