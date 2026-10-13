@@ -265,6 +265,7 @@ MonoBehaviour:
   - node1: {fileID: 1053155864}
     node2: {fileID: 854516923}
     dir: 0
+  bidirectionalPaths: 1
   graph: {fileID: 0}
 --- !u!4 &110915397
 Transform:
@@ -2062,9 +2063,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e62ee81f56d2e4b4197e99f8075d886c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  speed: 5
-  accuracy: 5
-  rotSpeed: 2
+  speed: 16.68
+  accuracy: 2.41
+  rotSpeed: 27.8
   wpManager: {fileID: 110915395}
 --- !u!1001 &1904515836
 PrefabInstance:

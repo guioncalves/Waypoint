@@ -48,19 +48,20 @@ public class FollowWP : MonoBehaviour
         Debug.Log("[TANQUE] Parado. A aguardar um botao.");
     }
 
+
     public void GoToHeli()
     {
-        MoveToWaypoint(0);
+        MoveToWaypoint(2); // WP003
     }
 
     public void GoToRuin()
     {
-        MoveToWaypoint(1);
+        MoveToWaypoint(9); // WP010
     }
 
     public void GoToFactory()
     {
-        MoveToWaypoint(4);
+        MoveToWaypoint(3); // WP004
     }
 
     void MoveToWaypoint(int index)
