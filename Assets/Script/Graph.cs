@@ -9,7 +9,7 @@ public class Graph : MonoBehaviour
 
     public List<Node> pathList = new List<Node>();
 
-    [Header("Pathfinding")]
+    [Header("Pathfinding A*")]
     public bool randomizeExploration = true;
     public bool showExplorationDebug = true;
 
@@ -20,18 +20,17 @@ public class Graph : MonoBehaviour
     [Range(0f, 5f)]
     public float memoryPenalty = 2f;
 
-    [Header("Memoria")]
+    [Header("Memoria dos caminhos")]
     [Min(1)]
     public int memoryLength = 8;
 
-    // Multiplicadores sorteados para uma pesquisa
     private Dictionary<Edge, float> randomCosts =
         new Dictionary<Edge, float>();
 
-    // Registo das ligacoes percorridas recentemente
     private Queue<string> recentConnections =
         new Queue<string>();
 
+    // REGISTAR WAYPOINTS
     public void AddNode(GameObject id)
     {
         if (id == null || FindNode(id) != null)
@@ -40,13 +39,23 @@ public class Graph : MonoBehaviour
         nodes.Add(new Node(id));
     }
 
+    // REGISTAR LIGACOES
+    // Mantemos o nome AddEdger para compatibilidade
+    // com o WPManager.cs.
     public void AddEdger(GameObject fromNode, GameObject toNode)
     {
         Node from = FindNode(fromNode);
         Node to = FindNode(toNode);
 
-        if (from == null || to == null)
+        if (from == null || to == null || from == to)
             return;
+
+        // Evitar ligacoes duplicadas.
+        foreach (Edge existing in from.edgeList)
+        {
+            if (existing.toNode == to)
+                return;
+        }
 
         Edge edge = new Edge(from, to);
 
@@ -54,6 +63,7 @@ public class Graph : MonoBehaviour
         from.edgeList.Add(edge);
     }
 
+    // PROCURAR UM NODE
     private Node FindNode(GameObject id)
     {
         foreach (Node node in nodes)
@@ -65,7 +75,37 @@ public class Graph : MonoBehaviour
         return null;
     }
 
-    // Identifica uma ligacao nos dois sentidos.
+    // OBTER WAYPOINTS DIRETAMENTE LIGADOS
+    // Este metodo e utilizado pelo FolloWP.cs.
+    public List<GameObject> GetConnectedWaypoints(GameObject waypoint)
+    {
+        List<GameObject> connected = new List<GameObject>();
+
+        if (waypoint == null)
+            return connected;
+
+        Node node = FindNode(waypoint);
+
+        if (node == null)
+            return connected;
+
+        foreach (Edge edge in node.edgeList)
+        {
+            if (edge.toNode == null)
+                continue;
+
+            GameObject next = edge.toNode.getId();
+
+            if (next != null && !connected.Contains(next))
+            {
+                connected.Add(next);
+            }
+        }
+
+        return connected;
+    }
+
+    // IDENTIFICAR UMA LIGACAO NOS DOIS SENTIDOS
     private string ConnectionKey(Node a, Node b)
     {
         int idA = a.getId().GetInstanceID();
@@ -77,7 +117,7 @@ public class Graph : MonoBehaviour
         return idB + "_" + idA;
     }
 
-    // Guarda apenas as ligacoes efetivamente percorridas.
+    // REGISTAR LIGACOES PERCORRIDAS
     public void RegisterTraversal(GameObject fromID, GameObject toID)
     {
         Node from = FindNode(fromID);
@@ -90,8 +130,10 @@ public class Graph : MonoBehaviour
 
         recentConnections.Enqueue(key);
 
-        while (recentConnections.Count > memoryLength)
+        while (recentConnections.Count > Mathf.Max(1, memoryLength))
+        {
             recentConnections.Dequeue();
+        }
 
         if (showExplorationDebug)
         {
@@ -102,13 +144,13 @@ public class Graph : MonoBehaviour
         }
     }
 
+    // VERIFICAR SE UMA LIGACAO FOI UTILIZADA
     private bool WasRecentlyUsed(Node a, Node b)
     {
-        string key = ConnectionKey(a, b);
-
-        return recentConnections.Contains(key);
+        return recentConnections.Contains(ConnectionKey(a, b));
     }
 
+    // BARALHAR A ORDEM DE EXPLORACAO
     private List<Edge> ShuffleEdges(List<Edge> original)
     {
         List<Edge> shuffled = new List<Edge>(original);
@@ -125,6 +167,7 @@ public class Graph : MonoBehaviour
         return shuffled;
     }
 
+    // GERAR CUSTOS PSEUDOALEATORIOS
     private void GenerateRandomCosts()
     {
         randomCosts.Clear();
@@ -136,6 +179,7 @@ public class Graph : MonoBehaviour
         }
     }
 
+    // ALGORITMO A*
     public bool AStar(GameObject startID, GameObject endID)
     {
         pathList.Clear();
@@ -149,6 +193,7 @@ public class Graph : MonoBehaviour
             return false;
         }
 
+        // Reiniciar os valores dos Nodes.
         foreach (Node node in nodes)
         {
             node.g = float.PositiveInfinity;
@@ -188,6 +233,7 @@ public class Graph : MonoBehaviour
                 );
             }
 
+            // Destino encontrado.
             if (current == end)
             {
                 ReconstructPatth(start, end);
@@ -204,8 +250,8 @@ public class Graph : MonoBehaviour
 
             List<Edge> neighbours =
                 randomizeExploration
-                ? ShuffleEdges(current.edgeList)
-                : current.edgeList;
+                    ? ShuffleEdges(current.edgeList)
+                    : current.edgeList;
 
             foreach (Edge edge in neighbours)
             {
@@ -218,17 +264,20 @@ public class Graph : MonoBehaviour
                 float baseDistance =
                     Distance(current, neighbour);
 
-                float randomFactor = randomCosts[edge];
+                float randomFactor =
+                    randomCosts[edge];
 
-                float penalty = WasRecentlyUsed(
-                    current, neighbour
-                ) ? memoryPenalty : 0f;
+                float penalty =
+                    WasRecentlyUsed(current, neighbour)
+                        ? memoryPenalty
+                        : 0f;
 
-                // Todos os custos sao positivos.
+                // O custo nunca e inferior a distancia real.
                 float edgeCost =
                     baseDistance * (randomFactor + penalty);
 
-                float tentativeG = current.g + edgeCost;
+                float tentativeG =
+                    current.g + edgeCost;
 
                 if (showExplorationDebug)
                 {
@@ -249,7 +298,9 @@ public class Graph : MonoBehaviour
                     neighbour.f = neighbour.g + neighbour.h;
 
                     if (!open.Contains(neighbour))
+                    {
                         open.Add(neighbour);
+                    }
                 }
             }
         }
@@ -262,6 +313,9 @@ public class Graph : MonoBehaviour
         return false;
     }
 
+    // RECONSTRUIR O PERCURSO ENCONTRADO
+    // Mantemos o nome ReconstructPatth para
+    // compatibilidade com o projeto.
     public void ReconstructPatth(Node startID, Node endID)
     {
         pathList.Clear();
@@ -281,6 +335,7 @@ public class Graph : MonoBehaviour
         pathList.Clear();
     }
 
+    // DISTANCIA ENTRE DOIS NODES
     private float Distance(Node a, Node b)
     {
         return Vector3.Distance(
@@ -289,6 +344,7 @@ public class Graph : MonoBehaviour
         );
     }
 
+    // ESCOLHER O NODE COM MENOR F
     private int LowestF(List<Node> list)
     {
         float lowest = float.PositiveInfinity;
@@ -311,7 +367,9 @@ public class Graph : MonoBehaviour
         }
 
         if (!randomizeExploration || candidates.Count == 1)
+        {
             return candidates[0];
+        }
 
         return candidates[Random.Range(0, candidates.Count)];
     }
