@@ -1,4 +1,4 @@
-using System.Collections;
+
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -18,48 +18,64 @@ public class WPManager : MonoBehaviour
     public GameObject[] waypoints;
     public Link[] links;
 
+    [Header("Configuracao dos caminhos")]
+    public bool bidirectionalPaths = true;
+
     public Graph graph;
 
     void Awake()
     {
+        // Obter o Graph associado ao WPManager
         graph = GetComponent<Graph>();
 
-        Debug.Log("Graph encontrado? " + (graph != null));
-    }
-
-    void Start()
-    {
         if (graph == null)
         {
-            Debug.LogError("Graph nao encontrado!");
+            Debug.LogError("[WPManager] Graph nao encontrado!");
             return;
         }
 
         if (waypoints == null || waypoints.Length == 0)
         {
-            Debug.LogError("WPManager sem Waypoints!");
+            Debug.LogError("[WPManager] Sem Waypoints!");
             return;
         }
 
-        foreach (GameObject wp in waypoints)
+        // Registar todos os Waypoints
+        for (int i = 0; i < waypoints.Length; i++)
         {
-            if (wp != null)
+            if (waypoints[i] != null)
             {
-                graph.AddNode(wp);
+                graph.AddNode(waypoints[i]);
             }
         }
 
-        foreach (Link l in links)
+        // Registar as ligacoes entre os Waypoints
+        if (links != null)
         {
-            if (l.node1 == null || l.node2 == null)
-                continue;
-
-            graph.AddEdger(l.node1, l.node2);
-
-            if (l.dir == Link.direction.BI)
+            for (int i = 0; i < links.Length; i++)
             {
-                graph.AddEdger(l.node2, l.node1);
+                Link l = links[i];
+
+                if (l.node1 == null || l.node2 == null)
+                    continue;
+
+                // Ligacao de Node 1 para Node 2
+                graph.AddEdger(l.node1, l.node2);
+
+                // Ligacao no sentido inverso, quando permitida
+                if (bidirectionalPaths ||
+                    l.dir == Link.direction.BI)
+                {
+                    graph.AddEdger(l.node2, l.node1);
+                }
             }
         }
+
+        Debug.Log(
+            "[WPManager] Grafo construido com " +
+            waypoints.Length + " Waypoints e " +
+            (links != null ? links.Length : 0) +
+            " Links configurados."
+        );
     }
 }

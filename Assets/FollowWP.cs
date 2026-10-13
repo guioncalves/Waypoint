@@ -1,29 +1,26 @@
 
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 public class FollowWP : MonoBehaviour
 {
-    Transform goal;
+    [Header("Movimento")]
+    public float speed = 12f;
+    public float accuracy = 1f;
+    public float rotSpeed = 180f;
 
-    public float speed = 5.0f;
-    public float accuracy = 5.0f;
-    public float rotSpeed = 2.0f;
-
+    [Header("Waypoints")]
     public GameObject wpManager;
 
-    GameObject[] wps;
-    GameObject currentNode;
+    private GameObject[] wps;
+    private Transform destination;
 
-    int currentWP = 0;
-    Graph g;
+    private bool isMoving = false;
 
     void Start()
     {
         if (wpManager == null)
         {
-            Debug.LogError("WPManager nao atribuido!");
+            Debug.LogError("[TANQUE] WPManager nao atribuido!");
             enabled = false;
             return;
         }
@@ -32,92 +29,128 @@ public class FollowWP : MonoBehaviour
 
         if (manager == null)
         {
-            Debug.LogError("Componente WPManager nao encontrado!");
+            Debug.LogError("[TANQUE] Componente WPManager nao encontrado!");
             enabled = false;
             return;
         }
 
         wps = manager.waypoints;
-        g = manager.graph;
 
-        if (g == null || wps == null || wps.Length < 2)
+        if (wps == null || wps.Length < 5)
         {
-            Debug.LogError("Graph ou Waypoints invalidos!");
+            Debug.LogError("[TANQUE] Waypoints invalidos!");
             enabled = false;
             return;
         }
 
-        currentNode = wps[0];
+        isMoving = false;
 
-        Invoke(nameof(GoToRuin), 2f);
+        Debug.Log("[TANQUE] Parado. A aguardar um botao.");
     }
 
     public void GoToHeli()
     {
-        if (g.AStar(currentNode, wps[0]))
-            currentWP = 0;
+        MoveToWaypoint(0);
     }
 
     public void GoToRuin()
     {
-        if (g.AStar(currentNode, wps[1]))
-            currentWP = 0;
+        MoveToWaypoint(1);
     }
 
-    void LateUpdate()
+    public void GoToFactory()
     {
-        if (g == null ||
-            g.pathList.Count == 0 ||
-            currentWP >= g.pathList.Count)
+        MoveToWaypoint(4);
+    }
+
+    void MoveToWaypoint(int index)
+    {
+        if (isMoving)
         {
+            Debug.Log("[TANQUE] Ainda esta em movimento.");
             return;
         }
 
-        Vector3 targetPosition =
-            g.pathList[currentWP].getId().transform.position;
+        if (index < 0 || index >= wps.Length ||
+            wps[index] == null)
+        {
+            Debug.LogError("[TANQUE] Waypoint invalido!");
+            return;
+        }
 
+        // Escolher diretamente o Waypoint do botao
+        destination = wps[index].transform;
+
+        isMoving = true;
+
+        Debug.Log("[BOTAO] Destino escolhido: " +
+                  destination.name);
+    }
+
+    void Update()
+    {
+        // Sem clique, o tanque fica parado
+        if (!isMoving)
+            return;
+
+        if (destination == null)
+        {
+            StopTank();
+            return;
+        }
+
+        Vector3 targetPosition = destination.position;
+
+        // Manter o movimento no plano horizontal
         targetPosition.y = transform.position.y;
 
-        if (Vector3.Distance(transform.position, targetPosition) < accuracy)
+        Vector3 direction = targetPosition - transform.position;
+
+        float distance = direction.magnitude;
+
+        // Chegou ao destino escolhido
+        if (distance <= accuracy)
         {
-            currentNode = g.pathList[currentWP].getId();
-            currentWP++;
+            StopTank();
+            return;
         }
 
-        if (currentWP >= g.pathList.Count)
-            return;
+        // Rodar na direcao do destino
+        Quaternion targetRotation =
+            Quaternion.LookRotation(direction);
 
-        goal = g.pathList[currentWP].getId().transform;
-
-        Vector3 lookAtGoal = new Vector3(
-            goal.position.x,
-            transform.position.y,
-            goal.position.z
-        );
-
-        Vector3 direction = lookAtGoal - transform.position;
-
-        if (direction.sqrMagnitude < 0.001f)
-            return;
-
-        Quaternion targetRotation = Quaternion.LookRotation(direction);
-
-        transform.rotation = Quaternion.Slerp(
+        transform.rotation = Quaternion.RotateTowards(
             transform.rotation,
             targetRotation,
-            Time.deltaTime * rotSpeed
+            rotSpeed * Time.deltaTime
         );
 
-        // Evita avancar enquanto estiver demasiado desalinhado
-        float angle = Vector3.Angle(transform.forward, direction);
+        // Avancar apenas quando estiver orientado
+        float angle = Vector3.Angle(
+            transform.forward,
+            direction
+        );
 
-        if (angle < 45f)
+        if (angle <= 10f)
         {
-            transform.Translate(
-                0,
-                0,
+            transform.position = Vector3.MoveTowards(
+                transform.position,
+                targetPosition,
                 speed * Time.deltaTime
             );
         }
+    }
+
+    void StopTank()
+    {
+        isMoving = false;
+
+        Debug.Log("[TANQUE PARADO] Chegou a " +
+                  (destination != null ?
+                   destination.name : "destino desconhecido"));
+
+        destination = null;
+
+        Debug.Log("[TANQUE] A aguardar outro botao.");
     }
 }

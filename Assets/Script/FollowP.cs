@@ -1,146 +1,133 @@
 
 using UnityEngine;
+using System.Collections.Generic;
 
-public class FollowP : MonoBehaviour
+public class FolloWP : MonoBehaviour
 {
-    [Header("Waypoints")]
-    public GameObject[] waypoints;
-
     [Header("Movimento")]
-    public float speed = 10f;
-    public float rotSpeed = 120f;
-    public float stoppingDistance = 3f;
+    public float speed = 12f;
+    public float accuracy = 1.5f;
+    public float rotSpeed = 180f;
 
-    [Header("Evitar Colisoes")]
-    public float separationDistance = 4f;
-    public float separationStrength = 2f;
+    [Header("Waypoints")]
+    public GameObject wpManager;
 
+    private GameObject[] wps;
+    private GameObject currentNode;
+    private Graph g;
+
+    private List<Node> currentPath = new List<Node>();
     private int currentWP = 0;
-    private bool isLeader;
-
-    private Transform greenTank;
-    private Vector3 formationOffset;
+    private bool isMoving = false;
 
     void Start()
     {
-        isLeader = gameObject.name == "GreenTank";
+        Debug.Log("FOLLOWWP ATIVO NO OBJETO: " + gameObject.name);
+        WPManager manager = wpManager.GetComponent<WPManager>();
 
-        if (isLeader)
+        wps = manager.waypoints;
+        g = manager.graph;
+
+        currentNode = wps[0];
+
+        // O tanque comeca parado
+        isMoving = false;
+    }
+    void LateUpdate()
+    {
+        if (!isMoving)
+            return;
+
+        if (g == null || g.pathList.Count == 0)
         {
-            if (waypoints == null || waypoints.Length == 0)
-            {
-                Debug.LogError("GreenTank sem Waypoints!");
-                enabled = false;
-            }
-
+            isMoving = false;
             return;
         }
-
-        GameObject leader = GameObject.Find("GreenTank");
-
-        if (leader == null)
-        {
-            Debug.LogError("GreenTank nao encontrado!");
-            enabled = false;
-            return;
-        }
-
-        greenTank = leader.transform;
-
-        // Guardar a posicao inicial na formacao
-        formationOffset =
-            greenTank.InverseTransformPoint(transform.position);
-
-        formationOffset.y = 0f;
     }
 
+    // Restante código do movimento...
+
+    public void GoToHeli()
+    {
+        Debug.Log("BOTAO HELI PREMIDO");
+        MoveToWaypoint(0);
+    }
+
+    public void GoToRuin()
+    {
+        Debug.Log("BOTAO RUIN PREMIDO");
+        MoveToWaypoint(1);
+    }
+
+    public void GoToFactory()
+    {
+        Debug.Log("BOTAO FACTORY PREMIDO");
+        MoveToWaypoint(4);
+    }
+    void MoveToWaypoint(int index)
+    {
+        if (g == null || isMoving)
+            return;
+
+        if (index < 0 || index >= wps.Length || wps[index] == null)
+            return;
+
+        if (g.AStar(currentNode, wps[index]))
+        {
+            currentPath = new List<Node>(g.pathList);
+            currentWP = 0;
+            isMoving = true;
+
+            Debug.Log("Botao selecionou: " + wps[index].name);
+            Debug.Log("Percurso com " + currentPath.Count + " nos.");
+        }
+        else
+        {
+            Debug.LogWarning("Nao existe caminho para " + wps[index].name);
+        }
+    }
     void Update()
     {
-        if (isLeader)
-            MoveLeader();
-        else
-            FollowLeader();
-    }
+        if (!isMoving)
+            return;
 
-    void MoveLeader()
-    {
-        Vector3 direction =
-            waypoints[currentWP].transform.position - transform.position;
-
-        direction.y = 0f;
-
-        if (direction.magnitude < 3f)
+        if (currentWP >= currentPath.Count)
         {
-            currentWP = (currentWP + 1) % waypoints.Length;
+            StopTank();
             return;
         }
 
-        MoveTank(direction, speed);
-    }
+        GameObject waypoint = currentPath[currentWP].getId();
 
-    void FollowLeader()
-    {
-        if (greenTank == null)
-            return;
+        Vector3 target = waypoint.transform.position;
+        target.y = transform.position.y;
 
-        // Posicao que o tanque deve ocupar na formacao
-        Vector3 destination =
-            greenTank.TransformPoint(formationOffset);
+        Vector3 direction = target - transform.position;
 
-        destination.y = transform.position.y;
+            Debug.Log(
+        "Waypoint atual: " + waypoint.name +
+        " | Distancia: " + direction.magnitude +
+        " | Waypoint numero: " + currentWP +
+        " / " + currentPath.Count
+            );
 
-        Vector3 direction = destination - transform.position;
-        direction.y = 0f;
-
-        // Calcular afastamento dos outros tanques
-        Vector3 separation = Vector3.zero;
-
-        FollowP[] tanks = FindObjectsOfType<FollowP>();
-
-        foreach (FollowP tank in tanks)
+        // Verificar se chegou ao waypoint
+        if (direction.magnitude <= accuracy)
         {
-            if (tank == this)
-                continue;
+            currentNode = waypoint;
+            currentWP++;
 
-            Vector3 away = transform.position - tank.transform.position;
-            away.y = 0f;
-
-            float distance = away.magnitude;
-
-            if (distance > 0.001f &&
-                distance < separationDistance)
+            // Ultimo waypoint alcancado
+            if (currentWP >= currentPath.Count)
             {
-                float strength =
-                    (separationDistance - distance) / separationDistance;
-
-                separation += away.normalized * strength;
+                StopTank();
             }
+
+            return;
         }
 
-        // Combinar formacao e separacao
-        Vector3 desiredDirection =
-            direction + separation * separationStrength;
-
-        if (desiredDirection.sqrMagnitude < 0.001f)
-            return;
-
-        float distanceToFormation = direction.magnitude;
-
-        float currentSpeed = Mathf.Min(
-            speed,
-            distanceToFormation * 2f
-        );
-
-        MoveTank(desiredDirection, currentSpeed);
-    }
-
-    void MoveTank(Vector3 direction, float moveSpeed)
-    {
-        if (direction.sqrMagnitude < 0.001f)
-            return;
-
-        Quaternion targetRotation =
-            Quaternion.LookRotation(direction);
+        // Rodar na direcao do waypoint
+        Quaternion targetRotation = Quaternion.LookRotation(direction);
 
         transform.rotation = Quaternion.RotateTowards(
             transform.rotation,
@@ -148,15 +135,22 @@ public class FollowP : MonoBehaviour
             rotSpeed * Time.deltaTime
         );
 
-        float angle =
-            Vector3.Angle(transform.forward, direction);
+        // Avancar apenas quando estiver orientado
+        if (Vector3.Angle(transform.forward, direction) < 45f)
+        {
+            transform.position = Vector3.MoveTowards(
+                transform.position,
+                target,
+                speed * Time.deltaTime
+            );
+        }
+    }
 
-        // Evitar avancar enquanto estiver virado
-        // numa direcao muito diferente
-        if (angle > 60f)
-            return;
+    void StopTank()
+    {
+        isMoving = false;
+        currentWP = 0;
 
-        transform.position +=
-            transform.forward * moveSpeed * Time.deltaTime;
+        Debug.Log("Tanque parado no destino: " + currentNode.name);
     }
 }
